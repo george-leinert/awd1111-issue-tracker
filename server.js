@@ -1,3 +1,7 @@
+//const config = require('config');
+//const database = require('./database');
+import config from 'config';
+import {connect} from './database.js';
 import * as dotenv from 'dotenv';
 dotenv.config();
 import express from 'express';
@@ -35,8 +39,13 @@ app.use((err, req, res, next) => {
 });
 
 //listen for requests
-const hostname = process.env.HOSTNAME || 'localhost';
-const port = process.env.PORT || 5000;
+
+//const hostname = process.env.HOSTNAME || 'localhost';
+//const port = process.env.PORT || 5000;
+const hostname = config.get('http.host');
+const port = config.get('http.port');
+
 app.listen(port, () => {
   debugMain(`Server running at http://${hostname}:${port}`);
 });
+
