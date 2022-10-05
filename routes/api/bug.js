@@ -136,6 +136,7 @@ router.put('/:bugId/classify', async (req,res,next) => {
 
 router.put('/:bugId/assign', async (req,res,next) => {
   //FixME: assign bug to a user and send response as json
+  try {
   const bugId = await dbModule.newId(req.params.bugId);
   const {assignedToUserId, assignedToUserName} = req.body;
   const bug = await dbModule.findBugById(bugId);
@@ -161,10 +162,14 @@ router.put('/:bugId/assign', async (req,res,next) => {
 
 
     res.status(200).json({text: 'Bug Assigned'});
+  }}
+  catch (err) {
+    next(err);
   }
 });
 router.put('/:bugId/close', async (req,res,next) => {
   //FixME: close bug and send response as json
+  try {
   const bugId = await dbModule.newId(req.params.bugId);
   const closed = req.body;
   const bug = await dbModule.findBugById(bugId);
@@ -183,7 +188,9 @@ router.put('/:bugId/close', async (req,res,next) => {
 
     await dbModule.updateBug(bugId, bug);
   }
-
+  } catch(err) {
+    next(err);
+  }
 });
 
 //export router
