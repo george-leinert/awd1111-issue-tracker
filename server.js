@@ -12,6 +12,9 @@ import cookieParser from 'cookie-parser';
 import * as path from 'path';
 import {bugRouter} from './routes/api/bug.js';
 import {userRouter} from './routes/api/user.js';
+import {commentRouter} from './routes/api/comment.js';
+import {testRouter} from './routes/api/test.js';
+
 
 
 //create application
@@ -23,6 +26,9 @@ app.use(cookieParser());
 //register routes
 app.use('/api/user', userRouter);
 app.use('/api/bug', bugRouter);
+app.use('/api/bug', commentRouter);
+app.use('/api/bug', testRouter);
+
 app.use('/', express.static('public', {index: 'index.html'}));
 
 

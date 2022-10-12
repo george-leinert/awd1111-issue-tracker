@@ -120,10 +120,70 @@ async function updateBug(bugId, updatedBug) {
   );
 }
 
+async function listAllComments(bug) {
+  const db = await connect();
+  const comments = await db.collection('comment').find({}).toArray();
+  return comments;
+}
+
+async function findCommentById(commentId) {
+  const db = await connect();
+  const comment = await db.collection('comment').findOne({ _id: { $eq: commentId } });
+  return comment;
+}
+
+async function insertComment(comment) {
+  const db = await connect();
+  await db.collection('comment').insertOne({
+    ...comment,
+    creationDate: new Date(),
+  });
+}
+
+async function listAllTestCases(bug) {
+  const db = await connect();
+  const testCases = await db.collection('testCase').find({}).toArray();
+  return testCases;
+}
+
+async function findTestCaseById(testCaseId) {
+  const db = await connect();
+  const testCase = await db.collection('testCase').findOne({ _id: { $eq: testCaseId } });
+  return testCase;
+}
+
+async function insertTestCase(testCase) {
+  const db = await connect();
+  await db.collection('testCase').insertOne({
+    ...testCase,
+    creationDate: new Date(),
+  });
+}
+
+async function updateTestCase(testId, updatedTest) {
+  const db = await connect();
+  await db.collection('testCase').updateOne(
+    { _id: { $eq: testId } },
+    {
+      $set: {
+        ...updatedTest,
+        lastUpdated: new Date(),
+      },
+    }
+  );
+}
+
+async function deleteTest(testId) {
+  const db = await connect();
+  debugDb(testId);
+ const info = await db.collection('testCase').deleteOne({ _id: { $eq: testId } });
+ debugDb(info);
+}
+
 
 
 // export functions
-export {newId, ping, connect, listAllUsers, findUserById, insertUser, checkEmail, findUserByEmail, updateUser, deleteUser, listAllBugs, findBugById, insertBug, updateBug}
+export {newId, ping, connect, listAllUsers, findUserById, insertUser, checkEmail, findUserByEmail, updateUser, deleteUser, listAllBugs, findBugById, insertBug, updateBug, listAllComments, findCommentById, insertComment, listAllTestCases, findTestCaseById, insertTestCase, updateTestCase, deleteTest}
 
 // test the database connection
 ping();
