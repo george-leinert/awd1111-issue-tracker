@@ -9,6 +9,7 @@ import Joi from 'joi';
 import { validId } from '../../middleware/validId.js';
 import { validBody } from '../../middleware/validBody.js';
 import { ObjectId } from 'mongodb';
+import { connect } from '../../database.js';
 
 
 //FIXME: use this array to store user data in for now
@@ -45,8 +46,80 @@ const router = express.Router();
 //register routes
 router.get('/list', async (req,res,next) => {
   try {
-    const users = await dbModule.listAllUsers();
-    res.json(users);
+    // const users = await dbModule.listAllUsers();
+    // res.json(users);
+    let {keywords, role, maxAge, minAge, sortBy, pageSize, pageNumber} = req.query;
+
+    maxAge = parseInt(maxAge);
+    minAge = parseInt(minAge);
+
+    const match = {};
+
+
+    const now = new Date();
+
+    const today = new Date();
+    today.setHours(0);
+    today.setMinutes(0);
+    today.setSeconds(0);
+    today.setMilliseconds(0);
+
+    const pastMin = new Date(today);
+    pastMin.setDate(pastMin.getDate() - minAge - 1);
+
+    const pastMax = new Date(today);
+    pastMax.setDate(pastMax.getDate() - maxAge);
+
+    if (minAge && maxAge) {
+      match.creationDate = { $lt: pastMin, $gte: pastMax };
+    } else if (minAge) {
+      match.creationDate = { $lt: pastMin} ;
+    } else if (maxAge) {
+      match.creationDate = { $gte: pastMax };
+    }
+
+    if (keywords){
+      match.$text = { $search: keywords};
+    }
+    if (role){
+      match.$role = { $eq: role};
+    }
+
+    let sort = {givenName: 1};
+
+    switch (sortBy) {
+      case 'newest': sort = { creationDate: -1}; break;
+      case 'oldest': sort = { creationDate: 1}; break;
+      case 'givenName': sort = { givenName: 1, familyName: 1, creationDate: 1}; break;
+      case 'role': sort = {role: 1,  givenName: 1, familyName: 1, creationDate: 1}; break;
+    }
+
+
+    const project = {email: 1, password: 1, fullName: 1, givenName: 1, familyName: 1, role: 1, lastUpdated: 1, creationDate: 1};
+
+
+    pageNumber = parseInt(pageNumber) || 1;
+    pageSize = parseInt(pageSize) || 5;
+
+    const skip = (pageNumber - 1) * pageSize;
+    const limit = pageSize;
+
+    const pipeline = [
+      {$match: match},
+      {$sort: sort},
+      {$project: project},
+      {$skip: skip},
+      {$limit: limit}
+    ];
+
+    const db = await connect();
+    const cursor = db.collection('user').aggregate(pipeline);
+    const results = await cursor.toArray();
+
+    res.json(results);
+
+
+
   } catch (err) {
     next(err);
   }

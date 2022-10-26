@@ -103,7 +103,6 @@ router.put('/:bugId/test/:testId/execute', validId('bugId'), validId('testId'), 
     const testId = req.testId;
     let random = await Math.floor(await Math.random() * 2);
     const test = await dbModule.findTestCaseById(testId);
-    let passed;
     if (random === 0){
       test.passed = true;
     } else {
