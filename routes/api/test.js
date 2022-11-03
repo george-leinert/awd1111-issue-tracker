@@ -33,7 +33,6 @@ router.get('/:bugId/test/list', validId('bugId'), async (req,res,next) => {
     const bug = await dbModule.findBugById(bugId);
     const testCases = await dbModule.listAllTestCases(bug);
     res.json(testCases);
-
   }
   catch(err){
     next(err)
