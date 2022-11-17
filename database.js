@@ -180,10 +180,16 @@ async function deleteTest(testId) {
  debugDb(info);
 }
 
+async function saveEdit(edit) {
+  const db = await connect();
+  return await db.collection('edits').insertOne(edit);
+}
+
+
 
 
 // export functions
-export {newId, ping, connect, listAllUsers, findUserById, insertUser, checkEmail, findUserByEmail, updateUser, deleteUser, listAllBugs, findBugById, insertBug, updateBug, listAllComments, findCommentById, insertComment, listAllTestCases, findTestCaseById, insertTestCase, updateTestCase, deleteTest}
+export {newId, ping, connect, listAllUsers, findUserById, insertUser, checkEmail, findUserByEmail, updateUser, deleteUser, listAllBugs, findBugById, insertBug, updateBug, listAllComments, findCommentById, insertComment, listAllTestCases, findTestCaseById, insertTestCase, updateTestCase, deleteTest, saveEdit}
 
 // test the database connection
 ping();

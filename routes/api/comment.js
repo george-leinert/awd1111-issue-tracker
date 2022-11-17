@@ -15,19 +15,22 @@ const router = express.Router();
 
 const newCommentSchema = Joi.object({
   text: Joi.string().trim().min(1).required(),
-  author: Joi.string().trim().min(1).required()
 });
 
 
 
 router.get('/:bugId/comment/list', validId('bugId'), async (req,res,next) => {
   try {
+    if (!req.auth){
+      return res.status('401').json({error: 'You must be logged in'});
+    } else {
+
 
     const bugId = req.bugId;
     const bug = await dbModule.findBugById(bugId);
     const comments = await dbModule.listAllComments(bug);
     res.json(comments);
-
+    }
   }
   catch(err){
     next(err)
@@ -36,9 +39,14 @@ router.get('/:bugId/comment/list', validId('bugId'), async (req,res,next) => {
 
 router.get('/:bugId/comment/:commentId', validId('bugId'), validId('commentId'), async (req,res,next) => {
   try {
+    if (!req.auth){
+      return res.status('401').json({error: 'You must be logged in'});
+    } else {
+
     const commentId = req.commentId;
     const comment = await dbModule.findCommentById(commentId);
     res.json(comment);
+    }
   }
   catch(err){
     next(err)
@@ -47,6 +55,10 @@ router.get('/:bugId/comment/:commentId', validId('bugId'), validId('commentId'),
 
 router.put('/:bugId/comment/new', validId('bugId'), validBody(newCommentSchema), async (req,res,next) => {
   try {
+    if (!req.auth){
+      return res.status('401').json({error: 'You must be logged in'});
+    } else {
+
     const _id = dbModule.newId();
     const creationDate = new Date();
     const {text, author} = req.body;
@@ -54,15 +66,26 @@ router.put('/:bugId/comment/new', validId('bugId'), validBody(newCommentSchema),
     const newComment = {
       _id, 
       text,
-      author,
       creationDate,
       bugId
     }
+
+    newComment.author =  {
+      _id : req.auth._id,
+      email : req.auth.email,
+      fullName: req.auth.fullName,
+      givenName: req.auth.givenName,
+      familyName: req.auth.familyName
+    }
+  
+  
+  
 
       await dbModule.insertComment(newComment);
       res.status(200).json('New Comment Added');
       
     }
+  }
   catch (err) {
     next(err);
   } 
