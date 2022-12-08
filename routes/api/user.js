@@ -13,7 +13,8 @@ import { connect } from '../../database.js';
 import bcrypt from 'bcrypt';
 import config from 'config';
 import jwt from 'jsonwebtoken';
-
+import {isLoggedIn} from '../../middleware/isLoggedIn.js';
+import {hasPermission} from '../../middleware/hasPermission.js';
 
 
 //FIXME: use this array to store user data in for now
@@ -41,11 +42,87 @@ const updateUserSchema = Joi.object({
   role: Joi.string().trim().min(1),
 });
 
+function setAuthCookie(res, authToken) {
+  const cookieOptions = {
+    httpOnly: true,
+    maxAge: parseInt(config.get('auth.cookieMaxAge')),
+  };
+  res.cookie('authToken', authToken, cookieOptions);
+}
+
+
+async function issueAuthToken(user) {
+  const authPayload = {
+    _id: user._id,
+    email: user.email,
+    givenName: user.givenName,
+    role: user.role,
+  };
+
+  // get role names
+  const roleNames = Array.isArray(user.role) ? user.role : [user.role];
+
+  // get all of the roles in parallel
+  const roles = await Promise.all(roleNames.map((roleName) => dbModule.findRoleByName(roleName)));
+
+  // combine the permission tables
+  const permissions = {};
+  for (const role of roles) {
+    if (role && role.permissions) {
+      for (const permission in role.permissions) {
+        if (role.permissions[permission] === true) {
+          permissions[permission] = true;
+        }
+      }
+    }
+  }
+
+  // update the token payload
+  authPayload.permissions = permissions;
+
+  // issue token
+  const authSecret = config.get('auth.secret');
+  const authOptions = { expiresIn: config.get('auth.tokenExpiresIn') };
+  const authToken = jwt.sign(authPayload, authSecret, authOptions);
+  return authToken;
+}
 
 
 
 //create router
 const router = express.Router();
+
+// router.put('/addthisrolebro', async (req,res,next) => {
+
+//   const id = await dbModule.newId();
+
+//   const role = {
+//     _id: id,
+//     name: "Business Analyst",
+//     permissions: {
+//       canEditUser: false,
+//       canAssignRole: false, 
+//       canViewData: true,
+//       canCreateBug: true,
+//       canEditAnyBug: true,
+//       canCloseAnyBug: true,
+//       canClassifyAnyBug: true,
+//       canReassignAnyBug: true,
+//       canEditAuthoredBug: true,
+//       canEditAssignedBug: true, 
+//       canReassignAssignedBug: true,
+//       canAddComments: true,
+//       canAddTestCase: false,
+//       canEditTestCase: false,
+//       canExecuteTestCase: false,
+//       canDeleteTestCase: false
+//     }
+//   }
+//   await dbModule.insertRole(role);
+
+//   res.json('added gg');
+// })
+
 
 //find me 
 //done
@@ -53,7 +130,15 @@ router.get('/me', async (req,res,next) =>{
   try{
     const user = await dbModule.findUserById(ObjectId(req.auth._id));
   
-    res.json(user);
+    const result = {
+      email: user.email,
+      givenName: user.givenName,
+      familyName: user.familyName,
+      role: user.role,
+      lastUpdated: user.lastUpdated,
+      creationDate: user.creationDate
+    }
+    res.json(result);
     debugMain(user._id);
   
   } catch(err){
@@ -62,11 +147,11 @@ router.get('/me', async (req,res,next) =>{
 
   //update logged in user
 //done
-router.put('/me', validBody(updateUserSchema), async (req,res,next) =>{
+router.put('/me', isLoggedIn(), validBody(updateUserSchema), async (req,res,next) =>{
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
+    // if (!req.auth){
+    //   return res.status('401').json({error: 'You must be logged in'});
+    // } else {
 
     const userId = dbModule.newId(req.auth._id);
 
@@ -100,7 +185,7 @@ router.put('/me', validBody(updateUserSchema), async (req,res,next) =>{
     debug('edit saved');
 
     res.json({message: 'User Updated!'});
-  }
+  // }
   } catch (err) {
     next(err)
   }
@@ -111,16 +196,8 @@ router.put('/me', validBody(updateUserSchema), async (req,res,next) =>{
 
 //register routes
 //done
-router.get('/list', async (req,res,next) => {
+router.get('/list', isLoggedIn(), hasPermission('canViewData'), async (req,res,next) => {
   try {
-
-    if (!req.auth){
-      res.status(401).json({error: "You must be logged in."});
-    } else {
-
-
-    // const users = await dbModule.listAllUsers();
-    // res.json(users);
     let {keywords, role, maxAge, minAge, sortBy, pageSize, pageNumber} = req.query;
 
     maxAge = parseInt(maxAge);
@@ -168,7 +245,7 @@ router.get('/list', async (req,res,next) => {
     }
 
 
-    const project = {email: 1, password: 1, fullName: 1, givenName: 1, familyName: 1, role: 1, lastUpdated: 1, creationDate: 1};
+    const project = {email: 1, fullName: 1, givenName: 1, familyName: 1, role: 1, lastUpdated: 1, creationDate: 1};
 
 
     pageNumber = parseInt(pageNumber) || 1;
@@ -190,9 +267,6 @@ router.get('/list', async (req,res,next) => {
     const results = await cursor.toArray();
 
     res.json(results);
-
-
-  }
   } catch (err) {
     next(err);
   }
@@ -200,20 +274,23 @@ router.get('/list', async (req,res,next) => {
 
 //find user by id
 //done
-router.get('/:userId', validId('userId'), async (req,res,next) => {
+router.get('/:userId', isLoggedIn(), validId('userId'), hasPermission('canViewData'), async (req,res,next) => {
   try{ 
-    if (!req.auth){
-      res.status(401).json({error: "You must be logged in."});
-    } else {
-
     const userId = req.userId;
     const user = await dbModule.findUserById(userId);
     if (!user) {
       res.status(404).json({ error: `User ${userId} not found` });
     } else {
-      res.json(user);
+      const result = {
+        email: user.email,
+        givenName: user.givenName,
+        familyName: user.familyName,
+        role: user.role,
+        lastUpdated: user.lastUpdated,
+        creationDate: user.creationDate
+      }
+      res.json(result);
     }
-  }
   } catch (err) {
     next(err);
   }
@@ -250,25 +327,28 @@ router.post('/register', validBody(newUserSchema), async (req,res,next) =>{
 
     await dbModule.insertUser(newUser);
 
-    const authPayload = {
-      _id: newUser._id,
-      email: newUser.email,
-      fullName: newUser.fullName,
-      givenName: newUser.givenName,
-      familyName: newUser.familyName,
-      role: newUser.role, 
-      creationDate: newUser.creationDate
-    };
-    const authSecret = config.get('auth.secret');
-    const authOptions = { expiresIn: config.get('auth.tokenExpiresIn')};
-    const authToken = jwt.sign(authPayload, authSecret, authOptions);
+    // const authPayload = {
+    //   _id: newUser._id,
+    //   email: newUser.email,
+    //   fullName: newUser.fullName,
+    //   givenName: newUser.givenName,
+    //   familyName: newUser.familyName,
+    //   role: newUser.role, 
+    //   creationDate: newUser.creationDate
+    // };
+    // const authSecret = config.get('auth.secret');
+    // const authOptions = { expiresIn: config.get('auth.tokenExpiresIn')};
+    // const authToken = jwt.sign(authPayload, authSecret, authOptions);
 
     
-    const authMaxAge = parseInt(config.get('auth.cookieMaxAge'));
-    res.cookie('authToken', authToken, { maxAge: authMaxAge, httpOnly: true });
+    // const authMaxAge = parseInt(config.get('auth.cookieMaxAge'));
+    // res.cookie('authToken', authToken, { maxAge: authMaxAge, httpOnly: true });
+
+    const authToken = await issueAuthToken(newUser);
+    setAuthCookie(res, authToken);
+  
 
     const userId = newUser._id;
-    // res.status(200).json('New User Registered', newUser._id, authToken);
 
     const edit = {
       timestamp: new Date(),
@@ -289,7 +369,6 @@ router.post('/register', validBody(newUserSchema), async (req,res,next) =>{
     else {
       res.status(400).json({error: 'Email Already Registered'});
     }
-  // }
 }
 catch (err) {
   next(err);
@@ -299,38 +378,34 @@ catch (err) {
 //login
 //done
 router.post('/login', validBody(loginSchema), async (req,res,next) =>{
-  //FIXME: check user's email and password and send response as json
   try {
   const email = req.body.email;
   const password = req.body.password;
 
-  // let foundUser = false;
-
-//   if (!email || !password){
-//     res.status(400).json({error: 'Please Enter Your Login Credentials'});
-//   }
-// else {
   const user = await dbModule.findUserByEmail(email);
 
   if (user && await bcrypt.compare(password, user.password)) {
-  // res.status(200).json(`Welcome Back! ${user._id}`);
-
-  const authPayload = {
-    _id: user._id,
-    email: user.email,
-    fullName: user.fullName,
-    givenName: user.givenName,
-    familyName: user.familyName,
-    role: user.role, 
-    creationDate: user.creationDate
-  };
-  const authSecret = config.get('auth.secret');
-  const authOptions = { expiresIn: config.get('auth.tokenExpiresIn')};
-  const authToken = jwt.sign(authPayload, authSecret, authOptions);
+  // const authPayload = {
+  //   _id: user._id,
+  //   email: user.email,
+  //   fullName: user.fullName,
+  //   givenName: user.givenName,
+  //   familyName: user.familyName,
+  //   role: user.role, 
+  //   creationDate: user.creationDate
+  // };
+  // const authSecret = config.get('auth.secret');
+  // const authOptions = { expiresIn: config.get('auth.tokenExpiresIn')};
+  // const authToken = jwt.sign(authPayload, authSecret, authOptions);
 
   
-  const authMaxAge = parseInt(config.get('auth.cookieMaxAge'));
-  res.cookie('authToken', authToken, { maxAge: authMaxAge, httpOnly: true });
+  // const authMaxAge = parseInt(config.get('auth.cookieMaxAge'));
+  // res.cookie('authToken', authToken, { maxAge: authMaxAge, httpOnly: true });
+
+  const authToken = await issueAuthToken(user);
+  setAuthCookie(res, authToken);
+
+
 
   const userId = user._id;
 
@@ -345,20 +420,14 @@ router.post('/login', validBody(loginSchema), async (req,res,next) =>{
 } catch (err) {
   next(err);
 }
-// }
 });
 
 //update user
 //done
-router.put('/:userId', validId('userId'), validBody(updateUserSchema), async (req,res,next) =>{
-  //FIXME: update existing user and send response as json
+router.put('/:userId', isLoggedIn(), validId('userId'), hasPermission('canEditUser'), validBody(updateUserSchema), async (req,res,next) =>{
   try {
-    if (!req.auth){
-      res.status(401).json({error: "You must be logged in."});
-    } else {
 
   const userId = req.userId;
-  // const {email,password,givenName,familyName,role} = req.body;
   const user = await dbModule.findUserById(userId);
   const updatedUser = req.body;
   if (updatedUser.password){
@@ -386,7 +455,6 @@ if (Object.keys(updatedUser).length > 0){
       op: 'update',
       col: 'user',
       target: { userId },
-      //might need to change the update field
       update: updatedUser,
       auth: req.auth, 
     };
@@ -395,7 +463,6 @@ if (Object.keys(updatedUser).length > 0){
 
 
   }
-}
   } catch(err) {
     next(err)
   }
@@ -403,12 +470,8 @@ if (Object.keys(updatedUser).length > 0){
 
 //delete user
 //done
-router.delete('/:userId', validId('userId'), async (req,res,next) =>{
-  //FIXME: delete user and send response as json
+router.delete('/:userId', isLoggedIn(), validId('userId'), hasPermission('canEditUser'), async (req,res,next) =>{
   try {
-    if (!req.auth){
-      res.status(401).json({error: "You must be logged in."});
-    } else {
 
   const userId = req.userId;
   debugMain(userId);
@@ -431,11 +494,11 @@ const edit = {
 };
 await saveEdit(edit);
 
-}
   } catch (err) {
     next (err);
   }
 });
+
 
 
 //export router

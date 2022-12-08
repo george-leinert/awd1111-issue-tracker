@@ -10,6 +10,10 @@ import { validId } from '../../middleware/validId.js';
 import { validBody } from '../../middleware/validBody.js';
 import { ObjectId } from 'mongodb';
 import e from 'express';
+import {isLoggedIn} from '../../middleware/isLoggedIn.js';
+import {hasPermission} from '../../middleware/hasPermission.js';
+
+
 
 
 const router = express.Router();
@@ -26,46 +30,32 @@ const updateTestCaseSchema = Joi.object({
   author: Joi.string().trim().min(1)
 });
 
-router.get('/:bugId/test/list', validId('bugId'), async (req,res,next) => {
+router.get('/:bugId/test/list', isLoggedIn(), validId('bugId'), hasPermission('canViewData'), async (req,res,next) => {
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
-
     const bugId = req.bugId;
     const bug = await dbModule.findBugById(bugId);
     const testCases = await dbModule.listAllTestCases(bug);
     res.json(testCases);
     }
-  }
   catch(err){
     next(err)
   }
 });
 
-router.get('/:bugId/test/:testId', validId('bugId'), validId('testId'), async (req,res,next) => {
+router.get('/:bugId/test/:testId', isLoggedIn(), validId('bugId'), validId('testId'), hasPermission('canViewData'), async (req,res,next) => {
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
-
     const testId = req.testId;
     const test = await dbModule.findTestCaseById(testId);
     res.json(test);
     }
-  }
   catch(err){
     next(err)
   }
 });
 
 
-router.put('/:bugId/test/new', validId('bugId'), validBody(newTestCaseSchema), async (req,res,next) => {
+router.put('/:bugId/test/new', isLoggedIn(), validId('bugId'), validBody(newTestCaseSchema), hasPermission('canAddTestCase'), async (req,res,next) => {
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
-
     const _id = dbModule.newId();
     const creationDate = new Date();
     const {title, passed, author} = req.body;
@@ -104,7 +94,6 @@ router.put('/:bugId/test/new', validId('bugId'), validBody(newTestCaseSchema), a
       res.status(200).json('New Test Case Added');
       
     }
-  }
   catch (err) {
     next(err);
   } 
@@ -112,12 +101,8 @@ router.put('/:bugId/test/new', validId('bugId'), validBody(newTestCaseSchema), a
 });
 
 
-router.put('/:bugId/test/:testId', validId('bugId'), validId('testId'), validBody(updateTestCaseSchema), async (req,res,next) => {
+router.put('/:bugId/test/:testId', isLoggedIn(), validId('bugId'), validId('testId'), validBody(updateTestCaseSchema), hasPermission('canEditTestCase'), async (req,res,next) => {
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
-
     const bugId = req.bugId;
     const testId = req.testId;
     const test = await dbModule.findTestCaseById(testId);
@@ -151,19 +136,14 @@ router.put('/:bugId/test/:testId', validId('bugId'), validId('testId'), validBod
       debug('edit saved');
   
     }
-  }
   } catch(err) {
     next(err);
   }
 });
 
 
-router.put('/:bugId/test/:testId/execute', validId('bugId'), validId('testId'), async (req,res,next) => {
+router.put('/:bugId/test/:testId/execute', isLoggedIn(), validId('bugId'), validId('testId'), hasPermission('canExecuteTestCase'), async (req,res,next) => {
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
-
     const testId = req.testId;
     let random = await Math.floor(await Math.random() * 2);
     const test = await dbModule.findTestCaseById(testId);
@@ -174,7 +154,6 @@ router.put('/:bugId/test/:testId/execute', validId('bugId'), validId('testId'), 
     }
     await dbModule.updateTestCase(testId, test);
     res.status(200).json("Test Executed");
-  }
   } catch(err) {
     next(err);
   }
@@ -182,12 +161,8 @@ router.put('/:bugId/test/:testId/execute', validId('bugId'), validId('testId'), 
 });
 
 
-router.delete('/:bugId/test/:testId', validId('bugId'), validId('testId'), async (req,res,next) => {
+router.delete('/:bugId/test/:testId', isLoggedIn(), validId('bugId'), validId('testId'), hasPermission('canDeleteTestCase'), async (req,res,next) => {
   try {
-    if (!req.auth){
-      return res.status('401').json({error: 'You must be logged in'});
-    } else {
-
       const testId = req.testId;
       const test = await dbModule.findTestCaseById(testId);
      if(!test) {
@@ -208,7 +183,6 @@ router.delete('/:bugId/test/:testId', validId('bugId'), validId('testId'), async
       await saveEdit(edit);
       
     }
-  }
   } catch(err) {
     next(err);
   }

@@ -185,11 +185,23 @@ async function saveEdit(edit) {
   return await db.collection('edits').insertOne(edit);
 }
 
+// async function insertRole(role) {
+//   const db = await connect();
+//   await db.collection('role').insertOne({
+//     ...role,
+//   });
+// }
+
+
+async function findRoleByName(roleName) {
+  const db = await connect();
+  return await db.collection('role').findOne({ name: { $eq: roleName } });
+}
 
 
 
 // export functions
-export {newId, ping, connect, listAllUsers, findUserById, insertUser, checkEmail, findUserByEmail, updateUser, deleteUser, listAllBugs, findBugById, insertBug, updateBug, listAllComments, findCommentById, insertComment, listAllTestCases, findTestCaseById, insertTestCase, updateTestCase, deleteTest, saveEdit}
+export {newId, ping, connect, listAllUsers, findUserById, insertUser, checkEmail, findUserByEmail, updateUser, deleteUser, listAllBugs, findBugById, insertBug, updateBug, listAllComments, findCommentById, insertComment, listAllTestCases, findTestCaseById, insertTestCase, updateTestCase, deleteTest, saveEdit, findRoleByName}
 
 // test the database connection
 ping();
