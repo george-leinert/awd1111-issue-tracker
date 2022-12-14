@@ -25,8 +25,8 @@ const newUserSchema = Joi.object({
   password: Joi.string().trim().min(1).required(),
   givenName: Joi.string().trim().min(1).required(),
   familyName: Joi.string().trim().min(1).required(),
-  role: Joi.string().trim().min(1).required(),
-});
+  role: Joi.string().trim().min(1)
+})
 
 const loginSchema = Joi.object({
   email: Joi.string().trim().min(1).email().required(),
@@ -285,6 +285,7 @@ router.get('/:userId', isLoggedIn(), validId('userId'), hasPermission('canViewDa
         email: user.email,
         givenName: user.givenName,
         familyName: user.familyName,
+        fullName: user.fullName,
         role: user.role,
         lastUpdated: user.lastUpdated,
         creationDate: user.creationDate
