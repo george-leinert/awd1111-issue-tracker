@@ -122,7 +122,7 @@ async function updateBug(bugId, updatedBug) {
 
 async function listAllComments(bug) {
   const db = await connect();
-  const comments = await db.collection('comment').find({}).toArray();
+  const comments = await db.collection('comment').find({ bugId : { $eq: bug._id}}).toArray();
   return comments;
 }
 

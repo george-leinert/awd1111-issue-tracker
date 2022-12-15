@@ -167,20 +167,23 @@ router.get('/:bugId', isLoggedIn(), validId('bugId'), hasPermission('canViewData
   }
 });
 
-router.put('/new', isLoggedIn(), validBody(newBugSchema), hasPermission('canCreateData'),  async (req,res,next) => {
+router.put('/report', isLoggedIn(), validBody(newBugSchema), hasPermission('canCreateBug'), async (req,res,next) => {
 
   try {
   
     const _id = dbModule.newId();
     const creationDate = new Date();
+
     const {title, description, stepsToReproduce} = req.body;
+    
     const newBug = {
       _id, 
       title,
       description,
       stepsToReproduce,
       creationDate,
-      createdBy: ObjectId(req.auth._id)
+      closed: false,
+      authorOfBug: ObjectId(req.auth._id)
     }
 
     const bugId = newBug._id
@@ -205,6 +208,7 @@ router.put('/new', isLoggedIn(), validBody(newBugSchema), hasPermission('canCrea
     next(err);
   } 
 });
+
 
 router.put('/:bugId', isLoggedIn(), validId('bugId'), validBody(updateBugSchema), async (req,res,next) => {
 
@@ -338,7 +342,7 @@ router.put('/:bugId/close', isLoggedIn(), validId('bugId'), validBody(closeBugSc
   try {
 
   const bugId = req.bugId;
-  const closed = req.closed;
+  const closed = req.body.closed;
   const bug = await dbModule.findBugById(bugId);
 
 
